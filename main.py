@@ -10,6 +10,7 @@ import yfinance as yf
 load_dotenv('token.env')
 
 client = discord.Client()
+DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 WEATHER_TOKEN = os.getenv('WEATHER_TOKEN')
 owm = OWM(WEATHER_TOKEN)
 mgr = owm.weather_manager()
@@ -20,13 +21,29 @@ def get_quote():
   quote = json_data[0]['q'] + '-' + json_data[0]['a']
   return quote
 
-def get_weather(message):
-  location = ' '
+def get_i_am_joke(message):
   words = message.content.split(' ')
-  location_index = 0
+
+  try:
+    if 'i\'m' in message.content:
+      while (words[0] != 'i\'m'): words.pop(0)
+      words.pop(0)
+    else:
+      while (words[0] != 'i' and words[1] != 'am'): words.pop(0)
+      words.pop(0)
+      words.pop(0)
+  except:
+    words = message.author.name
+
+  joke = ' '.join(words)
+  return joke
+
+def get_weather(message):
+  location = ''
+  words = message.content.split(' ')
   
   # Parse for location in message
-  location = words[words.index('in') + 1]
+  location = words[words.index('in') + 1].capitalize()
   if location[-1] == '?': location = location[:-1]
 
   try:
@@ -35,12 +52,12 @@ def get_weather(message):
     # If we have an invalid location, use Hollywood (real-life Dimmsdale)
     observation = mgr.weather_at_place('Hollywood')
 
+  # Get weather
   w = observation.weather
-  weather = w.detailed_status
-  temperature_dict = w.temperature('fahrenheit')
-  temperature = temperature_dict.get('temp')
-  location = location.capitalize()
-  weather = weather.capitalize()
+  weather = w.detailed_status.capitalize()
+  weather_dict = w.temperature('fahrenheit')
+  temperature = weather_dict.get('temp')
+
   return {'location': location,
           'temperature': temperature,
           'weather': weather}
@@ -48,12 +65,16 @@ def get_weather(message):
 def get_stock(message):
   words = message.content.split(' ')
   try:
+    # Ticker after the word 'stock'
     stock_ticker = words[words.index('stock') + 1].upper()
     stock = yf.Ticker(stock_ticker)
+    
+    # Determine if the ticket exists in domestic US market
     stock.info['symbol']
   except:
     stock = yf.Ticker('MSFT')
 
+  # Return dictionary of stock info
   stock_info = stock.info
   return stock_info
 
@@ -66,7 +87,7 @@ async def on_ready():
 async def on_message(message):
   if message.author == client.user:
     return
-
+  
   message.content = message.content.lower()
 
   #greets user
@@ -81,36 +102,15 @@ async def on_message(message):
     return
 
   # tells 'hi [], i'm dad' joke
-  if ('i\'m' or 'i am') in message.content:
-    words = message.content.split(' ')
-
-    if message.content.startswith('i\'m') or message.content.startswith('i am'):
-      if 'i\'m' in message.content:
-        words.remove('i\'m')
-      else:
-        words.remove('i')
-        words.remove('am')
-    else:
-      try:
-        while (words[0] != 'i' and words[1] != 'am') and (words[0] != 'i\'m'):
-          words.pop(0)
-        if words[0] == 'i':
-          words.pop(0)
-          words.pop(0)
-        else:
-          words.pop(0)
-      except:
-        pass
-
-    s = ' '.join(words)
-    await message.channel.send(f'Hi, {s.capitalize()}! I\'m DadBot!')
+  if 'i\'m' in message.content or 'i am' in message.content:
+    joke = get_i_am_joke(message)
+    await message.channel.send(f'Hi, {joke.capitalize()}! I\'m Dad Bot!')
     return
   
   # tells weather
   if 'weather' in message.content:
     weather_dict = get_weather(message)
     await message.channel.send('In {0}, the weather\'s {1} and it\'s {2}\xb0F today!'.format(weather_dict['location'], weather_dict['weather'].lower(), weather_dict['temperature']))
-
     return
 
   # sends help information to user
@@ -132,5 +132,4 @@ async def on_message(message):
   if ('thanks' in message.content or 'thank you' in message.content) and 'dad' in message.content:
     await message.channel.send('You\'re welcome, Timmy, even if you\'re not my Timmy.')
 
-DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 client.run(DISCORD_TOKEN)
